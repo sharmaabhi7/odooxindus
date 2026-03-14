@@ -27,7 +27,11 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// ─── Health Check ─────────────────────────────────────────────────────
+// ─── Health check & Welcome ──────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to CoreInventory API', docs: '/api/v1', health: '/health' });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'CoreInventory API', timestamp: new Date().toISOString() });
 });
