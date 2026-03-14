@@ -1,7 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+require('dotenv').config();
+const prisma = require('../src/database/prisma');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Seeding CoreInventory database...');
