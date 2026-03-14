@@ -43,14 +43,23 @@ const validateTransfer = async (tenantId, transferId) => {
 
   // Move each item (each is a single ACID transaction)
   for (const item of transfer.items) {
-    await moveStock({
-      tenantId,
-      productId: item.productId,
-      fromLocationId: transfer.sourceLocationId,
-      toLocationId: transfer.destinationLocationId,
-      quantity: item.quantity,
-      referenceId: transferId,
-    });
+    try {
+      await moveStock({
+        tenantId,
+        productId: item.productId,
+        fromLocationId: transfer.sourceLocationId,
+        toLocationId: transfer.destinationLocationId,
+        quantity: item.quantity,
+        referenceId: transferId,
+      });
+    } catch (err) {
+      if (err.message.includes('Insufficient')) {
+        const productName = item.product?.name || item.productId;
+        const locationName = transfer.sourceLocation?.name || transfer.sourceLocationId;
+        throw Object.assign(new Error(`Insufficient stock for "${productName}" at ${locationName}`), { statusCode: 400 });
+      }
+      throw err;
+    }
   }
 
   return transferRepo.updateStatus(transferId, 'validated', {

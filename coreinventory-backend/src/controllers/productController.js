@@ -10,14 +10,39 @@ const createRules = [
   body('reorderLevel').isInt({ min: 0 }),
 ];
 
+const prisma = require('../database/prisma');
+const { increaseStock } = require('../services/stockService');
+
 const create = [
   ...createRules,
   validate,
   async (req, res, next) => {
     try {
-      const { name, sku, categoryId, unit, reorderLevel } = req.body;
-      const product = await productRepo.create(req.tenantId, { name, sku, categoryId, unit, reorderLevel });
-      return successResponse(res, product, 'Product created', 201);
+      const { name, sku, categoryId, unit, reorderLevel, initialQuantity, initialLocationId } = req.body;
+      
+      const result = await prisma.$transaction(async (tx) => {
+        const product = await productRepo.create(req.tenantId, { 
+          name, 
+          sku, 
+          categoryId: categoryId || null, 
+          unit, 
+          reorderLevel 
+        }, tx);
+
+        if (initialQuantity > 0 && initialLocationId) {
+          await increaseStock({
+            tenantId: req.tenantId,
+            productId: product.id,
+            locationId: initialLocationId,
+            quantity: Number(initialQuantity),
+            movementType: 'adjustment',
+            referenceId: 'initial_stock'
+          }, tx);
+        }
+        return product;
+      });
+
+      return successResponse(res, result, 'Product created', 201);
     } catch (err) { next(err); }
   },
 ];
@@ -40,12 +65,19 @@ const getById = async (req, res, next) => {
 };
 
 const update = async (req, res, next) => {
-  try {
-    const { name, sku, categoryId, unit, reorderLevel } = req.body;
-    await productRepo.update(req.tenantId, req.params.id, { name, sku, categoryId, unit, reorderLevel });
-    const updated = await productRepo.findById(req.tenantId, req.params.id);
-    return successResponse(res, updated, 'Product updated');
-  } catch (err) { next(err); }
+    try {
+      const { name, sku, categoryId, unit, reorderLevel } = req.body;
+      const filteredData = {};
+      if (name !== undefined) filteredData.name = name;
+      if (sku !== undefined) filteredData.sku = sku;
+      if (categoryId !== undefined) filteredData.categoryId = categoryId || null;
+      if (unit !== undefined) filteredData.unit = unit;
+      if (reorderLevel !== undefined) filteredData.reorderLevel = Number(reorderLevel);
+
+      await productRepo.update(req.tenantId, req.params.id, filteredData);
+      const updated = await productRepo.findById(req.tenantId, req.params.id);
+      return successResponse(res, updated, 'Product updated');
+    } catch (err) { next(err); }
 };
 
 const remove = async (req, res, next) => {

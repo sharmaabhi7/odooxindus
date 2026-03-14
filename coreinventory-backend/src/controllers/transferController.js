@@ -4,10 +4,10 @@ const { body } = require('express-validator');
 const { validate } = require('../utils/validators');
 
 const createRules = [
-  body('sourceLocationId').isUUID(),
-  body('destinationLocationId').isUUID(),
+  body('sourceLocationId').notEmpty(),
+  body('destinationLocationId').notEmpty(),
   body('items').isArray({ min: 1 }),
-  body('items.*.productId').isUUID(),
+  body('items.*.productId').notEmpty(),
   body('items.*.quantity').isInt({ min: 1 }),
 ];
 

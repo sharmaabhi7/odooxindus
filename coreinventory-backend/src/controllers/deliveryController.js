@@ -6,8 +6,8 @@ const { validate } = require('../utils/validators');
 const createRules = [
   body('customerName').notEmpty().trim(),
   body('items').isArray({ min: 1 }),
-  body('items.*.productId').isUUID(),
-  body('items.*.locationId').isUUID(),
+  body('items.*.productId').notEmpty(),
+  body('items.*.locationId').notEmpty(),
   body('items.*.quantity').isInt({ min: 1 }),
 ];
 

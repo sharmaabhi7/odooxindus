@@ -4,10 +4,11 @@ const { body } = require('express-validator');
 const { validate } = require('../utils/validators');
 
 const createRules = [
+  body('supplierId').optional({ checkFalsy: true }).notEmpty().withMessage('Invalid supplier ID'),
   body('items').isArray({ min: 1 }).withMessage('At least one item required'),
-  body('items.*.productId').isUUID(),
-  body('items.*.locationId').isUUID(),
-  body('items.*.quantity').isInt({ min: 1 }),
+  body('items.*.productId').notEmpty().withMessage('Invalid product ID'),
+  body('items.*.locationId').notEmpty().withMessage('Invalid location ID'),
+  body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
 ];
 
 const create = [

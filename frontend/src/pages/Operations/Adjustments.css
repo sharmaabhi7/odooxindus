@@ -1,0 +1,54 @@
+.adjustments-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.adjustment-alerts {
+  margin-bottom: 24px;
+}
+
+.alert-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+}
+
+.alert-card.warning {
+  background-color: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.alert-card.warning svg {
+  color: #f59e0b;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-title {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.alert-text {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.product-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-danger { color: var(--danger); font-weight: 600; }
+.text-success { color: var(--success); font-weight: 600; }
+
+.status-approved { background: #dcfce7; color: #166534; }
+.status-pending { background: #fffbeb; color: #92400e; }
+.status-reviewing { background: #e0f2fe; color: #0369a1; }

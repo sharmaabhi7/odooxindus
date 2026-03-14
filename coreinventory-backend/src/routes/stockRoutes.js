@@ -12,6 +12,7 @@ router.get('/ledger', stockCtrl.getLedger);
 router.get('/product/:productId', stockCtrl.getByProduct);
 
 // Adjustments
+router.get('/adjust', adjustmentCtrl.getAll);
 router.post('/adjust', adjustmentCtrl.create);
 
 module.exports = router;

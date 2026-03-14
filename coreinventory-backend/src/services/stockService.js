@@ -9,29 +9,43 @@ const { sendLowStockAlert } = require('../email/emailService');
 
 /**
  * Upsert stock record (create if missing, update if exists)
- * Used internally by all stock operations.
  */
-const _upsertStock = async (tx, { tenantId, productId, locationId, delta }) => {
-  // Lock the row by reading it first (serialized within the transaction)
+const _upsertStock = async (tx, { tenantId, productId, locationId, quantityDelta = 0, reservedDelta = 0 }) => {
   const existing = await tx.stock.findUnique({
     where: { tenantId_productId_locationId: { tenantId, productId, locationId } },
   });
 
   if (existing) {
-    const newQty = existing.quantity + delta;
+    const newQty = existing.quantity + quantityDelta;
+    const newReserved = existing.reservedQuantity + reservedDelta;
+
     if (newQty < 0) {
-      throw new Error(`Insufficient stock for product ${productId} at location ${locationId}. Available: ${existing.quantity}, Requested: ${Math.abs(delta)}`);
+      throw Object.assign(new Error(`Insufficient stock for product ${productId} at location ${locationId}. Available: ${existing.quantity}, Requested: ${Math.abs(quantityDelta)}`), { statusCode: 400 });
     }
+
+    if (newReserved < 0) {
+      throw Object.assign(new Error(`Consistency error: Reserved quantity cannot be negative for product ${productId}`), { statusCode: 400 });
+    }
+
     return tx.stock.update({
       where: { id: existing.id },
-      data: { quantity: newQty },
+      data: { 
+        quantity: newQty,
+        reservedQuantity: newReserved
+      },
     });
   } else {
-    if (delta < 0) {
-      throw new Error(`No stock exists for product ${productId} at location ${locationId}`);
+    if (quantityDelta < 0 || reservedDelta < 0) {
+      throw Object.assign(new Error(`Insufficient initial stock for product ${productId} at location ${locationId}`), { statusCode: 400 });
     }
     return tx.stock.create({
-      data: { tenantId, productId, locationId, quantity: delta },
+      data: { 
+        tenantId, 
+        productId, 
+        locationId, 
+        quantity: quantityDelta,
+        reservedQuantity: reservedDelta
+      },
     });
   }
 };
@@ -52,25 +66,44 @@ const _writeLedger = async (tx, { tenantId, productId, locationId, movementType,
   });
 };
 
-/**
- * Increase stock (e.g., on Receipt validation)
- */
-const increaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }) => {
-  return prisma.$transaction(async (tx) => {
-    const stock = await _upsertStock(tx, { tenantId, productId, locationId, delta: quantity });
-    await _writeLedger(tx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: quantity });
+const increaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }, tx) => {
+  const client = tx || prisma;
+  return client.$transaction(async (pTx) => {
+    const stock = await _upsertStock(pTx, { tenantId, productId, locationId, quantityDelta: quantity });
+    await _writeLedger(pTx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: quantity });
     return stock;
   });
 };
 
 /**
- * Decrease stock (e.g., on Delivery validation)
+ * Decrease stock
  */
-const decreaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }) => {
-  return prisma.$transaction(async (tx) => {
-    const stock = await _upsertStock(tx, { tenantId, productId, locationId, delta: -quantity });
-    await _writeLedger(tx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: -quantity });
+const decreaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }, tx) => {
+  const client = tx || prisma;
+  return client.$transaction(async (pTx) => {
+    const stock = await _upsertStock(pTx, { tenantId, productId, locationId, quantityDelta: -quantity });
+    await _writeLedger(pTx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: -quantity });
     return stock;
+  });
+};
+
+/**
+ * Reserve stock (increase reservedQuantity, does not change main quantity)
+ */
+const reserveStock = async ({ tenantId, productId, locationId, quantity }, tx) => {
+  const client = tx || prisma;
+  return client.$transaction(async (pTx) => {
+    return _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: quantity });
+  });
+};
+
+/**
+ * Release stock (decrease reservedQuantity)
+ */
+const releaseStock = async ({ tenantId, productId, locationId, quantity }, tx) => {
+  const client = tx || prisma;
+  return client.$transaction(async (pTx) => {
+    return _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: -quantity });
   });
 };
 
@@ -81,14 +114,14 @@ const decreaseStock = async ({ tenantId, productId, locationId, quantity, moveme
 const moveStock = async ({ tenantId, productId, fromLocationId, toLocationId, quantity, referenceId }) => {
   return prisma.$transaction(async (tx) => {
     // Deduct from source
-    await _upsertStock(tx, { tenantId, productId, locationId: fromLocationId, delta: -quantity });
+    await _upsertStock(tx, { tenantId, productId, locationId: fromLocationId, quantityDelta: -quantity });
     await _writeLedger(tx, {
       tenantId, productId, locationId: fromLocationId,
       movementType: 'transfer_out', referenceId, quantityChange: -quantity,
     });
 
     // Add to destination
-    await _upsertStock(tx, { tenantId, productId, locationId: toLocationId, delta: quantity });
+    await _upsertStock(tx, { tenantId, productId, locationId: toLocationId, quantityDelta: quantity });
     await _writeLedger(tx, {
       tenantId, productId, locationId: toLocationId,
       movementType: 'transfer_in', referenceId, quantityChange: quantity,
@@ -153,4 +186,80 @@ const checkAndAlertLowStock = async (tenantId, managerEmails) => {
   return lowStockItems;
 };
 
-module.exports = { increaseStock, decreaseStock, moveStock, adjustStock, checkAndAlertLowStock };
+/**
+ * Get aggregated stock view for all products (On Hand vs Free to Use)
+ */
+const getStockView = async (tenantId) => {
+  return prisma.$queryRaw`
+    SELECT 
+      p.id, 
+      p.name, 
+      p.sku, 
+      p.unit,
+      p.reorder_level AS "reorderLevel",
+      c.name AS "categoryName",
+      COALESCE(SUM(s.quantity), 0)::int AS "onHand",
+      COALESCE(SUM(s.reserved_quantity), 0)::int AS "reserved",
+      (COALESCE(SUM(s.quantity), 0) - COALESCE(SUM(s.reserved_quantity), 0))::int AS "freeToUse"
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN stock s ON s.product_id = p.id AND s.tenant_id = ${tenantId}
+    WHERE p.tenant_id = ${tenantId}
+    GROUP BY p.id, p.name, p.sku, p.unit, p.reorder_level, c.name
+    ORDER BY p.name ASC
+  `;
+};
+
+/**
+ * Get full move history (Ledger)
+ */
+const getMoveHistory = async (tenantId, query = {}) => {
+  const { productId, locationId, movementType, skip = 0, take = 50 } = query;
+  
+  return prisma.stockLedger.findMany({
+    where: {
+      tenantId,
+      productId: productId || undefined,
+      locationId: locationId || undefined,
+      movementType: movementType || undefined,
+    },
+    select: {
+      id: true,
+      movementType: true,
+      referenceId: true,
+      quantityChange: true,
+      createdAt: true,
+      product: {
+        select: {
+          name: true,
+          sku: true
+        }
+      },
+      location: { 
+        select: { 
+          name: true,
+          warehouse: {
+            select: {
+              name: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    skip: Number(skip),
+    take: Number(take),
+  });
+};
+
+module.exports = { 
+  increaseStock, 
+  decreaseStock, 
+  moveStock, 
+  adjustStock, 
+  reserveStock, 
+  releaseStock, 
+  checkAndAlertLowStock,
+  getStockView,
+  getMoveHistory
+};

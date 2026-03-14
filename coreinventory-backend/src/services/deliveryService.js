@@ -42,14 +42,23 @@ const validateDelivery = async (tenantId, deliveryId, createdBy) => {
 
   // Decrease stock for each item - will throw if insufficient stock
   for (const item of delivery.items) {
-    await decreaseStock({
-      tenantId,
-      productId: item.productId,
-      locationId: item.locationId,
-      quantity: item.quantity,
-      movementType: 'delivery',
-      referenceId: deliveryId,
-    });
+    try {
+      await decreaseStock({
+        tenantId,
+        productId: item.productId,
+        locationId: item.locationId,
+        quantity: item.quantity,
+        movementType: 'delivery',
+        referenceId: deliveryId,
+      });
+    } catch (err) {
+      if (err.message.includes('Insufficient')) {
+        const productName = item.product?.name || item.productId;
+        const locationName = item.location?.name || item.locationId;
+        throw Object.assign(new Error(`Insufficient stock for "${productName}" at ${locationName}`), { statusCode: 400 });
+      }
+      throw err;
+    }
   }
 
   const updated = await deliveryRepo.updateStatus(deliveryId, 'validated', {

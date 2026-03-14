@@ -2,10 +2,11 @@ const { adjustStock } = require('../services/stockService');
 const { successResponse } = require('../utils/response');
 const { body } = require('express-validator');
 const { validate } = require('../utils/validators');
+const prisma = require('../database/prisma');
 
 const createRules = [
-  body('productId').isUUID(),
-  body('locationId').isUUID(),
+  body('productId').notEmpty(),
+  body('locationId').notEmpty(),
   body('newQty').isInt({ min: 0 }),
   body('reason').notEmpty().trim(),
 ];
@@ -29,4 +30,18 @@ const create = [
   },
 ];
 
-module.exports = { create };
+const getAll = async (req, res, next) => {
+  try {
+    const data = await prisma.adjustment.findMany({
+      where: { tenantId: req.tenantId },
+      include: {
+        product: { select: { name: true, sku: true } },
+        location: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return successResponse(res, data);
+  } catch (err) { next(err); }
+};
+
+module.exports = { create, getAll };

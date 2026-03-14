@@ -51,7 +51,7 @@ const deleteWarehouse = async (req, res, next) => {
 
 const createLocation = [
   body('name').notEmpty().trim(),
-  body('warehouseId').notEmpty().isUUID(),
+  body('warehouseId').notEmpty(),
   validate,
   async (req, res, next) => {
     try {
