@@ -15,7 +15,7 @@ router.delete('/warehouses/:id', authorize(['inventory_manager']), ctrl.deleteWa
 // Locations
 router.get('/locations', ctrl.getLocations);
 router.get('/locations/:id', ctrl.getLocationById);
-router.post('/locations', authorize(['inventory_manager']), ctrl.createLocation);
+router.post('/locations', ctrl.createLocation);
 router.put('/locations/:id', authorize(['inventory_manager']), ctrl.updateLocation);
 router.delete('/locations/:id', authorize(['inventory_manager']), ctrl.deleteLocation);
 

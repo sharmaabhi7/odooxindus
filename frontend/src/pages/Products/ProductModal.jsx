@@ -11,6 +11,9 @@ const ProductModal = ({ onClose, product }) => {
   const queryClient = useQueryClient();
   const { data: categories } = useCategories();
   const { data: locations } = useLocations();
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -38,8 +41,13 @@ const ProductModal = ({ onClose, product }) => {
     e.preventDefault();
     try {
       if (product) {
-        // Exclude initial stock fields from update
-        const { initialQuantity, initialLocationId, ...updateData } = formData;
+        const updateData = {
+          name: formData.name,
+          sku: formData.sku,
+          categoryId: formData.categoryId,
+          unit: formData.unit,
+          reorderLevel: formData.reorderLevel,
+        };
         await api.put(`/products/${product.id}`, updateData);
       } else {
         await api.post('/products', formData);
@@ -48,6 +56,27 @@ const ProductModal = ({ onClose, product }) => {
       onClose();
     } catch (err) {
       alert(`Error ${product ? 'updating' : 'creating'} product: ` + err.message);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    setCategoryError('');
+    const name = newCategoryName.trim();
+    if (!name) {
+      setCategoryError('Category name is required');
+      return;
+    }
+    setIsCreatingCategory(true);
+    try {
+      const { data } = await api.post('/categories', { name });
+      const createdCategory = data.data;
+      queryClient.invalidateQueries(['categories']);
+      setFormData(prev => ({ ...prev, categoryId: createdCategory.id }));
+      setNewCategoryName('');
+    } catch (err) {
+      setCategoryError(err.response?.data?.message || 'Failed to create category');
+    } finally {
+      setIsCreatingCategory(false);
     }
   };
 
@@ -82,6 +111,18 @@ const ProductModal = ({ onClose, product }) => {
                 <option value="">Select Category</option>
                 {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              <div className="category-create-row">
+                <input
+                  className="custom-select"
+                  placeholder="New category name"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                />
+                <Button type="button" variant="secondary" size="sm" onClick={handleCreateCategory} disabled={isCreatingCategory}>
+                  {isCreatingCategory ? 'Adding...' : 'Add'}
+                </Button>
+              </div>
+              {categoryError && <p className="category-create-error">{categoryError}</p>}
             </div>
             <Input 
               label="Unit" 
@@ -142,6 +183,18 @@ const ProductModal = ({ onClose, product }) => {
           font-size: 14px;
           background-color: white;
           outline: none;
+        }
+        .category-create-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px;
+          margin-top: 8px;
+          align-items: center;
+        }
+        .category-create-error {
+          margin-top: 6px;
+          font-size: 12px;
+          color: var(--danger);
         }
       `}</style>
     </div>

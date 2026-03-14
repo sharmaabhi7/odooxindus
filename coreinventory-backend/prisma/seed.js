@@ -75,6 +75,9 @@ async function main() {
       tenantId: tenant.id,
       name: 'Main Warehouse',
       address: '123 Industrial Road, Mumbai',
+      contactInfo: '+91-9000000000',
+      storageCapacity: 100000,
+      operationalHours: 'Mon-Sat 08:00-20:00',
     },
   });
 

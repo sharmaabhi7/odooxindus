@@ -8,6 +8,10 @@ const { validate } = require('../utils/validators');
 
 const createWarehouse = [
   body('name').notEmpty().trim(),
+  body('address').notEmpty().trim(),
+  body('contactInfo').notEmpty().trim(),
+  body('storageCapacity').isInt({ min: 1 }),
+  body('operationalHours').notEmpty().trim(),
   validate,
   async (req, res, next) => {
     try {
@@ -15,6 +19,14 @@ const createWarehouse = [
       return successResponse(res, warehouse, 'Warehouse created', 201);
     } catch (err) { next(err); }
   },
+];
+
+const updateWarehouseRules = [
+  body('name').optional().notEmpty().trim(),
+  body('address').optional().notEmpty().trim(),
+  body('contactInfo').optional().notEmpty().trim(),
+  body('storageCapacity').optional().isInt({ min: 1 }),
+  body('operationalHours').optional().notEmpty().trim(),
 ];
 
 const getWarehouses = async (req, res, next) => {
@@ -32,13 +44,17 @@ const getWarehouseById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const updateWarehouse = async (req, res, next) => {
-  try {
-    await warehouseRepo.update(req.tenantId, req.params.id, req.body);
-    const updated = await warehouseRepo.findById(req.tenantId, req.params.id);
-    return successResponse(res, updated, 'Warehouse updated');
-  } catch (err) { next(err); }
-};
+const updateWarehouse = [
+  ...updateWarehouseRules,
+  validate,
+  async (req, res, next) => {
+    try {
+      await warehouseRepo.update(req.tenantId, req.params.id, req.body);
+      const updated = await warehouseRepo.findById(req.tenantId, req.params.id);
+      return successResponse(res, updated, 'Warehouse updated');
+    } catch (err) { next(err); }
+  },
+];
 
 const deleteWarehouse = async (req, res, next) => {
   try {

@@ -84,12 +84,15 @@ model Product {
 }
 
 model Warehouse {
-  id        String     @id @default(uuid())
-  tenantId  String     @map("tenant_id")
-  name      String
-  address   String?
-  locations Location[]
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  id               String     @id @default(uuid())
+  tenantId         String     @map("tenant_id")
+  name             String
+  address          String
+  contactInfo      String     @map("contact_info")
+  storageCapacity  Int        @map("storage_capacity")
+  operationalHours String     @map("operational_hours")
+  locations        Location[]
+  tenant           Tenant     @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@map("warehouses")

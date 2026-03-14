@@ -1,0 +1,50 @@
+.warehouse-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warehouse-notice {
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.warehouse-notice.success {
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  background: #ecfdf5;
+}
+
+.warehouse-notice.error {
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.warehouse-modal-content {
+  max-width: 720px;
+}
+
+.warehouse-modal-subtitle {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.warehouse-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.warehouse-form-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .warehouse-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

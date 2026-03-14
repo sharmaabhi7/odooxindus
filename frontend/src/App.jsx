@@ -9,6 +9,7 @@ import Transfers from './pages/Operations/Transfers';
 import Adjustments from './pages/Operations/Adjustments';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
 import Stocks from './pages/Stocks';
 import MoveHistory from './pages/MoveHistory';
 import Warehouses from './pages/Warehouses';
@@ -38,6 +39,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="products" element={<Products />} />

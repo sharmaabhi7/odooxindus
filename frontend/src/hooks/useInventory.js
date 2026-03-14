@@ -81,6 +81,16 @@ export const useLocations = () => {
   });
 };
 
+export const useWarehouses = () => {
+  return useQuery({
+    queryKey: ['warehouses'],
+    queryFn: async () => {
+      const { data } = await api.get('/warehouses');
+      return data.data;
+    },
+  });
+};
+
 export const useAdjustments = () => {
   return useQuery({
     queryKey: ['adjustments'],

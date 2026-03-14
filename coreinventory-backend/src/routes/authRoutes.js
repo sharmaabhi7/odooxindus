@@ -6,10 +6,10 @@ const tenantMiddleware = require('../middleware/tenantMiddleware');
 // Public routes
 router.post('/register', authController.register);
 router.post('/login', authController.login);
-
-// Routes requiring auth (for OTP — user must be in context)
-router.post('/forgot-password', authenticate, tenantMiddleware, authController.forgotPassword);
-router.post('/reset-password', authenticate, tenantMiddleware, authController.resetPassword);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/resend-password-otp', authController.resendPasswordOtp);
+router.post('/verify-password-otp', authController.verifyPasswordOtp);
+router.post('/reset-password', authController.resetPassword);
 
 // Protected profile routes
 router.get('/profile', authenticate, tenantMiddleware, authController.getProfile);

@@ -7,6 +7,11 @@ const startServer = async () => {
   try {
     await prisma.$connect();
     await prisma.$executeRawUnsafe('ALTER TABLE "stock" ADD COLUMN IF NOT EXISTS "reserved_quantity" INTEGER NOT NULL DEFAULT 0');
+    await prisma.$executeRawUnsafe('ALTER TABLE "warehouses" ADD COLUMN IF NOT EXISTS "contact_info" TEXT NOT NULL DEFAULT \'\'');
+    await prisma.$executeRawUnsafe('ALTER TABLE "warehouses" ADD COLUMN IF NOT EXISTS "storage_capacity" INTEGER NOT NULL DEFAULT 0');
+    await prisma.$executeRawUnsafe('ALTER TABLE "warehouses" ADD COLUMN IF NOT EXISTS "operational_hours" TEXT NOT NULL DEFAULT \'\'');
+    await prisma.$executeRawUnsafe('UPDATE "warehouses" SET "address" = \'\' WHERE "address" IS NULL');
+    await prisma.$executeRawUnsafe('ALTER TABLE "warehouses" ALTER COLUMN "address" SET NOT NULL');
     console.log('✅ Database connected');
 
     app.listen(port, () => {

@@ -3,7 +3,7 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  otpExpiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '10'),
+  otpExpiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES || '5'),
   smtp: {
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),

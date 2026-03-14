@@ -11,16 +11,22 @@ export default function Login() {
   const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+    setIsSubmitting(true);
     try {
       await login(email, password, slug);
       navigate('/');
     } catch (err) {
-      alert('Login failed. Please check your credentials.');
+      setErrorMessage(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -79,11 +85,15 @@ export default function Login() {
                 <input type="checkbox" />
                 <span>Remember me</span>
               </label>
-              <a href="#" className="forgot-link">Forgot password?</a>
+              <Link to={`/forgot-password${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`} className="forgot-link">Forgot password?</Link>
             </div>
+
+            {errorMessage && (
+              <p className="auth-inline-error" role="alert">{errorMessage}</p>
+            )}
             
-            <Button type="submit" variant="primary" className="login-submit">
-              Sign In
+            <Button type="submit" variant="primary" className="login-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
           

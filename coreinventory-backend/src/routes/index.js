@@ -12,7 +12,7 @@ router.get('/dashboard', dashCtrl.getDashboard);
 
 // Categories
 router.get('/categories', catCtrl.getAll);
-router.post('/categories', authorize(['inventory_manager']), catCtrl.create);
+router.post('/categories', catCtrl.create);
 router.put('/categories/:id', authorize(['inventory_manager']), catCtrl.update);
 router.delete('/categories/:id', authorize(['inventory_manager']), catCtrl.remove);
 

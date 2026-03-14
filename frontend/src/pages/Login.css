@@ -103,6 +103,12 @@
   font-weight: 500;
 }
 
+.auth-inline-error {
+  font-size: 13px;
+  color: var(--danger);
+  margin-top: -8px;
+}
+
 .login-submit {
   width: 100%;
   margin-top: 12px;

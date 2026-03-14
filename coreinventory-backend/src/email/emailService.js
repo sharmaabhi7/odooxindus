@@ -40,11 +40,11 @@ const sendEmail = async ({ to, subject, html }) => {
 /**
  * Send OTP for password reset
  */
-const sendOTP = async ({ to, name, otp }) => {
+const sendOTP = async ({ to, name, otp, expiresMinutes = 5 }) => {
   return sendEmail({
     to,
     subject: 'CoreInventory - Password Reset OTP',
-    html: otpTemplate({ name, otp }),
+    html: otpTemplate({ name, otp, expiresMinutes }),
   });
 };
 

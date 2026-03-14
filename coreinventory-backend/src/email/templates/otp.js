@@ -1,4 +1,4 @@
-const otpTemplate = ({ name, otp }) => `
+const otpTemplate = ({ name, otp, expiresMinutes = 5 }) => `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><style>
@@ -15,7 +15,7 @@ const otpTemplate = ({ name, otp }) => `
     <div class="logo">CoreInventory</div>
     <h2>Password Reset Request</h2>
     <p>Hi ${name},</p>
-    <p>You requested to reset your password. Use the OTP below. It expires in 10 minutes.</p>
+    <p>You requested to reset your password. Use the OTP below. It expires in ${expiresMinutes} minutes.</p>
     <div class="otp-box">${otp}</div>
     <p>If you didn't request this, please ignore this email.</p>
     <div class="footer">CoreInventory &mdash; Inventory Management Platform</div>
