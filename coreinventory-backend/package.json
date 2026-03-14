@@ -1,0 +1,19 @@
+{
+  "name": "coreinventory-backend",
+  "version": "1.0.0",
+  "description": "CoreInventory - Multi-Tenant Inventory Management System API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "studio": "prisma studio",
+    "generate": "prisma generate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
