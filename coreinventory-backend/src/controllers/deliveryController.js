@@ -1,7 +1,7 @@
 const deliveryService = require('../services/deliveryService');
 const { successResponse } = require('../utils/response');
 const { body } = require('express-validator');
-const { validate } = require('../utils/validators');
+const { validate: validationRules } = require('../utils/validators');
 
 const createRules = [
   body('customerName').notEmpty().trim(),
@@ -13,7 +13,7 @@ const createRules = [
 
 const create = [
   ...createRules,
-  validate,
+  validationRules,
   async (req, res, next) => {
     try {
       const { customerName, items, notes } = req.body;
@@ -43,11 +43,11 @@ const getById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const validate_ = async (req, res, next) => {
+const validate = async (req, res, next) => {
   try {
     const updated = await deliveryService.validateDelivery(req.tenantId, req.params.id, req.user.id);
     return successResponse(res, updated, 'Delivery validated — stock decremented');
   } catch (err) { next(err); }
 };
 
-module.exports = { create, getAll, getById, validate: validate_ };
+module.exports = { create, getAll, getById, validate };

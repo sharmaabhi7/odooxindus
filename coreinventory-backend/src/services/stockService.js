@@ -16,8 +16,10 @@ const _upsertStock = async (tx, { tenantId, productId, locationId, quantityDelta
   });
 
   if (existing) {
+    const hasReservedQuantity = Object.prototype.hasOwnProperty.call(existing, 'reservedQuantity');
     const newQty = existing.quantity + quantityDelta;
-    const newReserved = existing.reservedQuantity + reservedDelta;
+    const currentReserved = hasReservedQuantity ? existing.reservedQuantity : 0;
+    const newReserved = currentReserved + reservedDelta;
 
     if (newQty < 0) {
       throw Object.assign(new Error(`Insufficient stock for product ${productId} at location ${locationId}. Available: ${existing.quantity}, Requested: ${Math.abs(quantityDelta)}`), { statusCode: 400 });
@@ -27,25 +29,48 @@ const _upsertStock = async (tx, { tenantId, productId, locationId, quantityDelta
       throw Object.assign(new Error(`Consistency error: Reserved quantity cannot be negative for product ${productId}`), { statusCode: 400 });
     }
 
+    if (!hasReservedQuantity && reservedDelta !== 0) {
+      throw Object.assign(new Error('Reserved stock operations require an up-to-date Prisma client. Run prisma generate and restart the server.'), { statusCode: 500 });
+    }
+
+    const data = {
+      quantity: newQty,
+    };
+    if (hasReservedQuantity) data.reservedQuantity = newReserved;
+
     return tx.stock.update({
       where: { id: existing.id },
-      data: { 
-        quantity: newQty,
-        reservedQuantity: newReserved
-      },
+      data,
     });
   } else {
     if (quantityDelta < 0 || reservedDelta < 0) {
       throw Object.assign(new Error(`Insufficient initial stock for product ${productId} at location ${locationId}`), { statusCode: 400 });
     }
+    const createData = {
+      tenantId,
+      productId,
+      locationId,
+      quantity: quantityDelta,
+    };
+
+    if (reservedDelta !== 0) {
+      try {
+        return tx.stock.create({
+          data: {
+            ...createData,
+            reservedQuantity: reservedDelta,
+          },
+        });
+      } catch (err) {
+        if (err?.message?.includes('Unknown argument `reservedQuantity`')) {
+          throw Object.assign(new Error('Reserved stock operations require an up-to-date Prisma client. Run prisma generate and restart the server.'), { statusCode: 500 });
+        }
+        throw err;
+      }
+    }
+
     return tx.stock.create({
-      data: { 
-        tenantId, 
-        productId, 
-        locationId, 
-        quantity: quantityDelta,
-        reservedQuantity: reservedDelta
-      },
+      data: createData,
     });
   }
 };
@@ -67,8 +92,14 @@ const _writeLedger = async (tx, { tenantId, productId, locationId, movementType,
 };
 
 const increaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }, tx) => {
-  const client = tx || prisma;
-  return client.$transaction(async (pTx) => {
+  // If already inside a transaction, use the provided client directly (avoid nested transactions)
+  if (tx) {
+    const stock = await _upsertStock(tx, { tenantId, productId, locationId, quantityDelta: quantity });
+    await _writeLedger(tx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: quantity });
+    return stock;
+  }
+  // No outer transaction — create one
+  return prisma.$transaction(async (pTx) => {
     const stock = await _upsertStock(pTx, { tenantId, productId, locationId, quantityDelta: quantity });
     await _writeLedger(pTx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: quantity });
     return stock;
@@ -79,8 +110,14 @@ const increaseStock = async ({ tenantId, productId, locationId, quantity, moveme
  * Decrease stock
  */
 const decreaseStock = async ({ tenantId, productId, locationId, quantity, movementType, referenceId }, tx) => {
-  const client = tx || prisma;
-  return client.$transaction(async (pTx) => {
+  // If already inside a transaction, use the provided client directly (avoid nested transactions)
+  if (tx) {
+    const stock = await _upsertStock(tx, { tenantId, productId, locationId, quantityDelta: -quantity });
+    await _writeLedger(tx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: -quantity });
+    return stock;
+  }
+  // No outer transaction — create one
+  return prisma.$transaction(async (pTx) => {
     const stock = await _upsertStock(pTx, { tenantId, productId, locationId, quantityDelta: -quantity });
     await _writeLedger(pTx, { tenantId, productId, locationId, movementType, referenceId, quantityChange: -quantity });
     return stock;
@@ -91,42 +128,49 @@ const decreaseStock = async ({ tenantId, productId, locationId, quantity, moveme
  * Reserve stock (increase reservedQuantity, does not change main quantity)
  */
 const reserveStock = async ({ tenantId, productId, locationId, quantity }, tx) => {
-  const client = tx || prisma;
-  return client.$transaction(async (pTx) => {
-    return _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: quantity });
-  });
+  if (tx) {
+    return _upsertStock(tx, { tenantId, productId, locationId, reservedDelta: quantity });
+  }
+  return prisma.$transaction((pTx) => _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: quantity }));
 };
 
 /**
  * Release stock (decrease reservedQuantity)
  */
 const releaseStock = async ({ tenantId, productId, locationId, quantity }, tx) => {
-  const client = tx || prisma;
-  return client.$transaction(async (pTx) => {
-    return _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: -quantity });
-  });
+  if (tx) {
+    return _upsertStock(tx, { tenantId, productId, locationId, reservedDelta: -quantity });
+  }
+  return prisma.$transaction((pTx) => _upsertStock(pTx, { tenantId, productId, locationId, reservedDelta: -quantity }));
 };
 
 /**
  * Move stock between locations (e.g., Internal Transfer)
  * Both ledger entries created in a single transaction - zero sum.
  */
-const moveStock = async ({ tenantId, productId, fromLocationId, toLocationId, quantity, referenceId }) => {
-  return prisma.$transaction(async (tx) => {
+const moveStock = async ({ tenantId, productId, fromLocationId, toLocationId, quantity, referenceId }, tx) => {
+  const _run = async (client) => {
     // Deduct from source
-    await _upsertStock(tx, { tenantId, productId, locationId: fromLocationId, quantityDelta: -quantity });
-    await _writeLedger(tx, {
+    await _upsertStock(client, { tenantId, productId, locationId: fromLocationId, quantityDelta: -quantity });
+    await _writeLedger(client, {
       tenantId, productId, locationId: fromLocationId,
       movementType: 'transfer_out', referenceId, quantityChange: -quantity,
     });
 
     // Add to destination
-    await _upsertStock(tx, { tenantId, productId, locationId: toLocationId, quantityDelta: quantity });
-    await _writeLedger(tx, {
+    await _upsertStock(client, { tenantId, productId, locationId: toLocationId, quantityDelta: quantity });
+    await _writeLedger(client, {
       tenantId, productId, locationId: toLocationId,
       movementType: 'transfer_in', referenceId, quantityChange: quantity,
     });
-  });
+  };
+
+  if (tx) {
+    // Already in a transaction — run directly
+    return _run(tx);
+  }
+  // No outer transaction — create one
+  return prisma.$transaction((innerTx) => _run(innerTx));
 };
 
 /**

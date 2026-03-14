@@ -29,7 +29,7 @@ const create = [
           reorderLevel 
         }, tx);
 
-        if (initialQuantity > 0 && initialLocationId) {
+        if (Number(initialQuantity) > 0 && initialLocationId) {
           await increaseStock({
             tenantId: req.tenantId,
             productId: product.id,

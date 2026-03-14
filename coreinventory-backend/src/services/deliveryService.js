@@ -40,32 +40,36 @@ const validateDelivery = async (tenantId, deliveryId, createdBy) => {
   if (delivery.status === 'validated') throw Object.assign(new Error('Delivery already validated'), { statusCode: 400 });
   if (delivery.status === 'cancelled') throw Object.assign(new Error('Cannot validate a cancelled delivery'), { statusCode: 400 });
 
-  // Decrease stock for each item - will throw if insufficient stock
-  for (const item of delivery.items) {
-    try {
-      await decreaseStock({
-        tenantId,
-        productId: item.productId,
-        locationId: item.locationId,
-        quantity: item.quantity,
-        movementType: 'delivery',
-        referenceId: deliveryId,
-      });
-    } catch (err) {
-      if (err.message.includes('Insufficient')) {
-        const productName = item.product?.name || item.productId;
-        const locationName = item.location?.name || item.locationId;
-        throw Object.assign(new Error(`Insufficient stock for "${productName}" at ${locationName}`), { statusCode: 400 });
+  // Wrap all stock decreases + status update in a single atomic transaction
+  const updated = await prisma.$transaction(async (tx) => {
+    for (const item of delivery.items) {
+      try {
+        await decreaseStock({
+          tenantId,
+          productId: item.productId,
+          locationId: item.locationId,
+          quantity: item.quantity,
+          movementType: 'delivery',
+          referenceId: deliveryId,
+        }, tx);
+      } catch (err) {
+        if (err.message.includes('Insufficient')) {
+          const productName = item.product?.name || item.productId;
+          const locationName = item.location?.name || item.locationId;
+          throw Object.assign(new Error(`Insufficient stock for "${productName}" at ${locationName}`), { statusCode: 400 });
+        }
+        throw err;
       }
-      throw err;
     }
-  }
 
-  const updated = await deliveryRepo.updateStatus(deliveryId, 'validated', {
-    validatedAt: new Date(),
+    // Update delivery status inside the same transaction
+    return tx.delivery.update({
+      where: { id: deliveryId },
+      data: { status: 'validated', validatedAt: new Date() },
+    });
   });
 
-  // Send confirmation email (non-blocking)
+  // Send confirmation email (non-blocking, outside transaction)
   const creator = await prisma.user.findUnique({ where: { id: createdBy } });
   if (creator?.email) {
     sendDeliveryConfirmation({

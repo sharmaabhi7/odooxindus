@@ -5,8 +5,8 @@ const { port } = require('./config');
 
 const startServer = async () => {
   try {
-    // Test DB connection
     await prisma.$connect();
+    await prisma.$executeRawUnsafe('ALTER TABLE "stock" ADD COLUMN IF NOT EXISTS "reserved_quantity" INTEGER NOT NULL DEFAULT 0');
     console.log('✅ Database connected');
 
     app.listen(port, () => {
