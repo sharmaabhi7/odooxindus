@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { smtp } = require('../../config');
+const { smtp } = require('../config');
 const { otpTemplate } = require('./templates/otp');
 const { welcomeTemplate } = require('./templates/welcome');
 const { lowStockTemplate } = require('./templates/lowStock');
