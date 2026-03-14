@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
 export default function Login() {
+  const [slug, setSlug] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const login = useAuthStore((state) => state.login);
@@ -11,7 +12,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      await login(email, password, slug);
       navigate('/dashboard');
     } catch (err) {
       alert('Login failed');
@@ -26,6 +27,17 @@ export default function Login() {
           <p className="text-sm text-muted-foreground">Enter your credentials to access CoreInventory</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium leading-none">Company Slug</label>
+            <input 
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="text" 
+              placeholder="your-company-slug"
+              value={slug} 
+              onChange={(e) => setSlug(e.target.value)} 
+              required
+            />
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium leading-none">Email</label>
             <input 
