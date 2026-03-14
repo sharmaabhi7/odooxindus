@@ -14,6 +14,9 @@ const ReceiptModal = ({ onClose }) => {
 
   const [supplierId, setSupplierId] = useState('');
   const [items, setItems] = useState([{ productId: '', locationId: '', quantity: 1 }]);
+  const [newSupplier, setNewSupplier] = useState({ name: '', email: '', phone: '' });
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
+  const [supplierError, setSupplierError] = useState('');
 
   const addItem = () => setItems([...items, { productId: '', locationId: '', quantity: 1 }]);
   const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
@@ -45,6 +48,30 @@ const ReceiptModal = ({ onClose }) => {
     }
   };
 
+  const handleCreateSupplier = async () => {
+    setSupplierError('');
+    if (!newSupplier.name.trim()) {
+      setSupplierError('Supplier name is required');
+      return;
+    }
+    setIsCreatingSupplier(true);
+    try {
+      const { data } = await api.post('/suppliers', {
+        name: newSupplier.name.trim(),
+        email: newSupplier.email.trim() || undefined,
+        phone: newSupplier.phone.trim() || undefined,
+      });
+      const created = data.data;
+      setSupplierId(created.id);
+      setNewSupplier({ name: '', email: '', phone: '' });
+      queryClient.invalidateQueries(['suppliers']);
+    } catch (err) {
+      setSupplierError(err.response?.data?.message || 'Unable to create supplier');
+    } finally {
+      setIsCreatingSupplier(false);
+    }
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: '600px' }}>
@@ -65,6 +92,30 @@ const ReceiptModal = ({ onClose }) => {
                 <option value="">Select Supplier</option>
                 {suppliers?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              <div className="supplier-create-grid">
+                <input
+                  className="custom-select"
+                  placeholder="New supplier name"
+                  value={newSupplier.name}
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, name: e.target.value }))}
+                />
+                <input
+                  className="custom-select"
+                  placeholder="Supplier email"
+                  value={newSupplier.email}
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, email: e.target.value }))}
+                />
+                <input
+                  className="custom-select"
+                  placeholder="Supplier phone"
+                  value={newSupplier.phone}
+                  onChange={(e) => setNewSupplier((prev) => ({ ...prev, phone: e.target.value }))}
+                />
+                <Button type="button" variant="secondary" size="sm" onClick={handleCreateSupplier} disabled={isCreatingSupplier}>
+                  {isCreatingSupplier ? 'Adding...' : 'Add Supplier'}
+                </Button>
+              </div>
+              {supplierError && <p className="input-error">{supplierError}</p>}
             </div>
 
             <div className="items-section" style={{ marginTop: '24px' }}>
@@ -138,6 +189,18 @@ const ReceiptModal = ({ onClose }) => {
         .custom-select:focus {
           border-color: var(--primary);
           box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+        }
+        .supplier-create-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr auto;
+          gap: 8px;
+          margin-top: 10px;
+          align-items: center;
+        }
+        @media (max-width: 900px) {
+          .supplier-create-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

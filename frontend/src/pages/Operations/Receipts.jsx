@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
 import { 
   Plus, 
-  Search, 
   Calendar, 
   User, 
   ChevronRight, 
-  MapPin, 
-  Truck,
   CheckCircle2,
   Clock,
-  X
+  Printer
 } from 'lucide-react';
 import Table from '../../components/Table/Table';
 import Button from '../../components/Button/Button';
 import Card from '../../components/Card/Card';
-import Input from '../../components/Input/Input';
 import './Receipts.css';
 import ReceiptModal from './ReceiptModal';
+import TransactionDetailModal from './TransactionDetailModal';
 
 import { useReceipts } from '../../hooks/useInventory';
 import api from '../../services/api';
@@ -24,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 const Receipts = () => {
   const [showModal, setShowModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
   const { data: receiptsData, isLoading } = useReceipts();
   const queryClient = useQueryClient();
 
@@ -41,6 +39,19 @@ const Receipts = () => {
   };
 
   const receipts = receiptsData || [];
+  const toProcessCount = receipts.filter((receipt) => receipt.status === 'draft').length;
+  const receivedTodayUnits = receipts
+    .filter((receipt) => receipt.status === 'validated' && new Date(receipt.validatedAt || receipt.createdAt).toDateString() === new Date().toDateString())
+    .reduce((sum, receipt) => sum + (receipt.items || []).reduce((qty, item) => qty + Number(item.quantity || 0), 0), 0);
+
+  const handleOpenDetails = async (receiptId) => {
+    try {
+      const { data } = await api.get(`/receipts/${receiptId}`);
+      setSelectedReceipt(data.data);
+    } catch (err) {
+      alert('Failed to load receipt details: ' + (err.response?.data?.message || err.message));
+    }
+  };
 
   const columns = [
     { key: 'id', title: 'Receipt ID', render: (val) => <span className="receipt-id">{val ? val.substring(0, 8).toUpperCase() : 'NEW'}</span> },
@@ -62,9 +73,11 @@ const Receipts = () => {
     { key: 'actions', title: '', render: (_, row) => (
       <div style={{ display: 'flex', gap: '8px' }}>
         {row.status === 'draft' && (
-          <Button size="sm" variant="primary" onClick={() => handleValidate(row.id)}>Validate</Button>
+          <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); handleValidate(row.id); }}>Validate</Button>
         )}
-        <Button variant="ghost" size="sm"><ChevronRight size={18} /></Button>
+        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenDetails(row.id); }}>
+          <ChevronRight size={18} />
+        </Button>
       </div>
     )},
   ];
@@ -77,6 +90,7 @@ const Receipts = () => {
           <p className="page-description">Incoming shipments and supplier deliveries.</p>
         </div>
         <div className="page-actions">
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
           <Button icon={Plus} onClick={() => setShowModal(true)}>Create Receipt</Button>
         </div>
       </div>
@@ -86,23 +100,24 @@ const Receipts = () => {
           <div className="compact-stat-icon icon-blue"><Clock size={20} /></div>
           <div>
             <span className="compact-stat-label">To Process</span>
-            <span className="compact-stat-value">12</span>
+            <span className="compact-stat-value">{toProcessCount}</span>
           </div>
         </div>
         <div className="compact-stat">
           <div className="compact-stat-icon icon-green"><CheckCircle2 size={20} /></div>
           <div>
             <span className="compact-stat-label">Received Today</span>
-            <span className="compact-stat-value">458 units</span>
+            <span className="compact-stat-value">{receivedTodayUnits} units</span>
           </div>
         </div>
       </div>
 
       <Card noPadding>
-        <Table columns={columns} data={receipts} isLoading={isLoading} />
+        <Table columns={columns} data={receipts} isLoading={isLoading} onRowClick={(row) => handleOpenDetails(row.id)} />
       </Card>
 
       {showModal && <ReceiptModal onClose={() => setShowModal(false)} />}
+      {selectedReceipt && <TransactionDetailModal type="receipt" transaction={selectedReceipt} onClose={() => setSelectedReceipt(null)} />}
     </div>
   );
 };

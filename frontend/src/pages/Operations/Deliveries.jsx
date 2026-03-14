@@ -4,11 +4,10 @@ import {
   Search, 
   Truck, 
   User, 
-  MapPin, 
-  ChevronRight, 
   ExternalLink,
   PackageCheck,
-  AlertTriangle
+  AlertTriangle,
+  Printer
 } from 'lucide-react';
 import Table from '../../components/Table/Table';
 import Button from '../../components/Button/Button';
@@ -19,9 +18,11 @@ import { useDeliveries } from '../../hooks/useInventory';
 import api from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import DeliveryModal from './DeliveryModal';
+import TransactionDetailModal from './TransactionDetailModal';
 
 const Deliveries = () => {
   const [showModal, setShowModal] = useState(false);
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
   const { data: deliveriesData, isLoading } = useDeliveries();
   const queryClient = useQueryClient();
 
@@ -39,6 +40,20 @@ const Deliveries = () => {
   };
 
   const deliveries = deliveriesData || [];
+  const toShipCount = deliveries.filter((delivery) => delivery.status === 'draft').length;
+  const deliveredTodayCount = deliveries.filter(
+    (delivery) => delivery.status === 'validated' && new Date(delivery.validatedAt || delivery.createdAt).toDateString() === new Date().toDateString()
+  ).length;
+  const lateDeliveriesCount = deliveries.filter((delivery) => delivery.status === 'late').length;
+
+  const handleOpenDetails = async (deliveryId) => {
+    try {
+      const { data } = await api.get(`/deliveries/${deliveryId}`);
+      setSelectedDelivery(data.data);
+    } catch (err) {
+      alert('Failed to load delivery details: ' + (err.response?.data?.message || err.message));
+    }
+  };
 
   const columns = [
     { key: 'id', title: 'Delivery ID', render: (val) => <span className="delivery-id">{val ? val.substring(0, 8).toUpperCase() : 'NEW'}</span> },
@@ -55,9 +70,11 @@ const Deliveries = () => {
     { key: 'actions', title: '', render: (_, row) => (
       <div style={{ display: 'flex', gap: '8px' }}>
         {row.status === 'draft' && (
-          <Button size="sm" variant="primary" onClick={() => handleValidate(row.id)}>Validate</Button>
+          <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); handleValidate(row.id); }}>Validate</Button>
         )}
-        <Button variant="ghost" size="sm"><ExternalLink size={16} /></Button>
+        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenDetails(row.id); }}>
+          <ExternalLink size={16} />
+        </Button>
       </div>
     )},
   ];
@@ -70,6 +87,7 @@ const Deliveries = () => {
           <p className="page-description">Manage and track outgoing shipments to customers.</p>
         </div>
         <div className="page-actions">
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
           <Button icon={Plus} onClick={() => setShowModal(true)}>Create Delivery</Button>
         </div>
       </div>
@@ -80,7 +98,7 @@ const Deliveries = () => {
             <div className="summary-icon blue"><Truck size={24} /></div>
             <div>
               <span className="summary-label">To Ship</span>
-              <span className="summary-value">18</span>
+              <span className="summary-value">{toShipCount}</span>
             </div>
           </div>
         </Card>
@@ -89,7 +107,7 @@ const Deliveries = () => {
             <div className="summary-icon green"><PackageCheck size={24} /></div>
             <div>
               <span className="summary-label">Delivered Today</span>
-              <span className="summary-value">32</span>
+              <span className="summary-value">{deliveredTodayCount}</span>
             </div>
           </div>
         </Card>
@@ -98,7 +116,7 @@ const Deliveries = () => {
             <div className="summary-icon amber"><AlertTriangle size={24} /></div>
             <div>
               <span className="summary-label">Late Deliveries</span>
-              <span className="summary-value">3</span>
+              <span className="summary-value">{lateDeliveriesCount}</span>
             </div>
           </div>
         </Card>
@@ -115,10 +133,11 @@ const Deliveries = () => {
             <Button variant="secondary" size="sm">This Week</Button>
           </div>
         </div>
-        <Table columns={columns} data={deliveries} isLoading={isLoading} />
+        <Table columns={columns} data={deliveries} isLoading={isLoading} onRowClick={(row) => handleOpenDetails(row.id)} />
       </Card>
 
       {showModal && <DeliveryModal onClose={() => setShowModal(false)} />}
+      {selectedDelivery && <TransactionDetailModal type="delivery" transaction={selectedDelivery} onClose={() => setSelectedDelivery(null)} />}
     </div>
   );
 };

@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  ClipboardCheck, 
   Plus, 
-  Search, 
   AlertCircle, 
-  History,
-  CheckCircle,
-  XCircle,
-  Package
+  Package,
+  Printer
 } from 'lucide-react';
 import Table from '../../components/Table/Table';
 import Button from '../../components/Button/Button';
@@ -15,14 +11,16 @@ import Card from '../../components/Card/Card';
 import './Adjustments.css';
 
 import { useAdjustments } from '../../hooks/useInventory';
-import api from '../../services/api';
 import AdjustmentModal from './AdjustmentModal';
+import TransactionDetailModal from './TransactionDetailModal';
 
 const Adjustments = () => {
   const [showModal, setShowModal] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState(null);
   const { data: adjustmentsData, isLoading } = useAdjustments();
 
   const adjustments = adjustmentsData || [];
+  const pendingReviewCount = adjustments.filter((adjustment) => Math.abs(Number(adjustment.newQty || 0) - Number(adjustment.previousQty || 0)) >= 10).length;
 
   const columns = [
     { key: 'id', title: 'ADJ ID', render: (val) => val.substring(0, 8).toUpperCase() },
@@ -55,6 +53,7 @@ const Adjustments = () => {
           <p className="page-description">Manual stock corrections and cycle count audits.</p>
         </div>
         <div className="page-actions">
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
           <Button icon={Plus} onClick={() => setShowModal(true)}>New Adjustment</Button>
         </div>
       </div>
@@ -64,17 +63,18 @@ const Adjustments = () => {
           <AlertCircle size={20} />
           <div className="alert-content">
             <span className="alert-title">Pending Approvals</span>
-            <p className="alert-text">3 adjustments require your immediate review.</p>
+            <p className="alert-text">{pendingReviewCount} adjustments require your immediate review.</p>
           </div>
-          <Button variant="secondary" size="sm">Review Now</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>Print Review</Button>
         </div>
       </div>
 
       <Card noPadding>
-        <Table columns={columns} data={adjustments} isLoading={isLoading} />
+        <Table columns={columns} data={adjustments} isLoading={isLoading} onRowClick={(row) => setSelectedAdjustment(row)} />
       </Card>
 
       {showModal && <AdjustmentModal onClose={() => setShowModal(false)} />}
+      {selectedAdjustment && <TransactionDetailModal type="adjustment" transaction={selectedAdjustment} onClose={() => setSelectedAdjustment(null)} />}
     </div>
   );
 };

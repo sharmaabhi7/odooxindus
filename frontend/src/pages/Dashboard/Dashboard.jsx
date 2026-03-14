@@ -33,7 +33,7 @@ const Dashboard = () => {
     id: m.id.substring(0, 8),
     product: m.product.name,
     type: m.movementType.replace('_', ' ').toUpperCase(),
-    qty: m.quantityChange > 0 ? `+${m.quantityChange}` : m.quantityChange,
+    qty: m.quantityChange > 0 ? `+${m.quantityChange}` : String(m.quantityChange),
     status: 'Completed',
     date: new Date(m.createdAt).toLocaleDateString()
   }));
@@ -45,8 +45,8 @@ const Dashboard = () => {
       <span className={`badge badge-${val.toLowerCase()}`}>{val}</span>
     )},
     { key: 'qty', title: 'Quantity', render: (val) => (
-      <span style={{ fontWeight: 600, color: val.startsWith('+') ? 'var(--success)' : (val.startsWith('-') ? 'var(--danger)' : 'inherit') }}>
-        {val}
+      <span style={{ fontWeight: 600, color: String(val).startsWith('+') ? 'var(--success)' : (String(val).startsWith('-') ? 'var(--danger)' : 'inherit') }}>
+        {String(val)}
       </span>
     )},
     { key: 'status', title: 'Status', render: (val) => (

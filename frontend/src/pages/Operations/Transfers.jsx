@@ -1,12 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  ArrowRightLeft, 
   Plus, 
-  ArrowRight, 
-  MapPin, 
-  History,
-  Box,
-  MoreHorizontal
+  MoreHorizontal,
+  Printer
 } from 'lucide-react';
 import Table from '../../components/Table/Table';
 import Button from '../../components/Button/Button';
@@ -16,6 +12,7 @@ import './Transfers.css';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import TransferModal from './TransferModal';
+import TransactionDetailModal from './TransactionDetailModal';
 
 const useTransfers = () => {
   return useQuery({
@@ -29,6 +26,7 @@ const useTransfers = () => {
 
 const Transfers = () => {
   const [showModal, setShowModal] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState(null);
   const { data: transfersData, isLoading } = useTransfers();
   const queryClient = useQueryClient();
 
@@ -46,6 +44,25 @@ const Transfers = () => {
   };
 
   const transfers = transfersData || [];
+  const activeTransfersCount = transfers.filter((transfer) => transfer.status !== 'cancelled').length;
+  const pendingTransfersCount = transfers.filter((transfer) => transfer.status === 'draft').length;
+  const recentLocations = Array.from(
+    new Set(
+      transfers.flatMap((transfer) => [
+        transfer.sourceLocation?.name,
+        transfer.destinationLocation?.name,
+      ].filter(Boolean))
+    )
+  ).slice(0, 6);
+
+  const handleOpenDetails = async (transferId) => {
+    try {
+      const { data } = await api.get(`/transfers/${transferId}`);
+      setSelectedTransfer(data.data);
+    } catch (err) {
+      alert('Failed to load transfer details: ' + (err.response?.data?.message || err.message));
+    }
+  };
 
   const columns = [
     { key: 'id', title: 'Transfer ID', render: (val) => <span className="transfer-id">{val ? val.substring(0, 8).toUpperCase() : 'NEW'}</span> },
@@ -56,9 +73,11 @@ const Transfers = () => {
     { key: 'actions', title: '', render: (_, row) => (
       <div style={{ display: 'flex', gap: '8px' }}>
         {row.status === 'draft' && (
-          <Button size="sm" variant="primary" onClick={() => handleValidate(row.id)}>Validate</Button>
+          <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); handleValidate(row.id); }}>Validate</Button>
         )}
-        <Button variant="ghost" size="sm"><MoreHorizontal size={18} /></Button>
+        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleOpenDetails(row.id); }}>
+          <MoreHorizontal size={18} />
+        </Button>
       </div>
     )},
   ];
@@ -71,6 +90,7 @@ const Transfers = () => {
           <p className="page-description">Move stock between warehouses, zones, or bins.</p>
         </div>
         <div className="page-actions">
+          <Button variant="secondary" icon={Printer} onClick={() => window.print()}>Print</Button>
           <Button icon={Plus} onClick={() => setShowModal(true)}>New Transfer</Button>
         </div>
       </div>
@@ -78,7 +98,7 @@ const Transfers = () => {
       <div className="transfers-layout">
         <div className="transfers-main">
           <Card noPadding>
-            <Table columns={columns} data={transfers} isLoading={isLoading} />
+            <Table columns={columns} data={transfers} isLoading={isLoading} onRowClick={(row) => handleOpenDetails(row.id)} />
           </Card>
         </div>
         
@@ -87,24 +107,24 @@ const Transfers = () => {
           <Card title="Quick Stats">
             <div className="aside-stat">
               <span className="aside-stat-label">Total active transfers</span>
-              <span className="aside-stat-value">8</span>
+              <span className="aside-stat-value">{activeTransfersCount}</span>
             </div>
             <div className="aside-stat">
               <span className="aside-stat-label">Pending confirmation</span>
-              <span className="aside-stat-value">3</span>
+              <span className="aside-stat-value">{pendingTransfersCount}</span>
             </div>
           </Card>
           
           <Card title="Recent Locations" className="loc-card">
             <div className="recent-locs">
-              <div className="loc-tag">Warehouse A</div>
-              <div className="loc-tag">Warehouse B</div>
-              <div className="loc-tag">Main Hub</div>
-              <div className="loc-tag">Retail Store 1</div>
+              {recentLocations.length > 0 ? recentLocations.map((loc) => (
+                <div key={loc} className="loc-tag">{loc}</div>
+              )) : <div className="loc-tag">No recent locations</div>}
             </div>
           </Card>
         </div>
       </div>
+      {selectedTransfer && <TransactionDetailModal type="transfer" transaction={selectedTransfer} onClose={() => setSelectedTransfer(null)} />}
     </div>
   );
 };
